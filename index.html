@@ -110,8 +110,8 @@
     </main>
 
     <script>
-        // --- UPDATED API URL ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbwBR-E2y07UQvrmyCYqxGLPVe29P4cAKSw6isYa7UA83gRyK5zCAWgPqYHigSz03NuOBA/exec"; 
+        // --- YOUR LATEST API URL ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbxDJCn7gAUvoJf6Jwvi7HzjsThJbruR8jZqretqsCvGT0zyZLO1098-bpzyTDjMPqAV0w/exec";
 
         let libraryData = [];
         let previousDataString = "";
@@ -205,7 +205,7 @@
                 const div = document.createElement('div');
                 const activeClass = isSelected ? "bg-indigo-500/10 border-indigo-500/30" : "hover:bg-white/5 border-transparent hover:border-white/5";
                 
-                // --- FIX: Time Formatting ---
+                // Time Formatting
                 const dateObj = new Date(file.date);
                 const dateStr = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ", " + 
                                 dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -239,8 +239,30 @@
             try {
                 await saveToBackend(document.getElementById('fileId').value, document.getElementById('fileName').value || "Untitled", document.getElementById('htmlCode').value, 'save');
                 setTimeout(() => { fetchList(); document.getElementById('statusText').style.opacity = '1'; setTimeout(() => document.getElementById('statusText').style.opacity = '0', 3000); btn.querySelector('span').innerText = "Save"; }, 500);
-            } catch (e) { alert("Save failed."); btn.querySelector('span').innerText = "Save"; } 
+            } catch (e) { alert("Save failed: " + e.message); btn.querySelector('span').innerText = "Save"; } 
             finally { btn.disabled = false; btn.classList.remove('opacity-75'); document.getElementById('saveLoader').classList.add('hidden'); }
+        }
+
+        // --- ROBUST BACKEND SAVE FUNCTION ---
+        async function saveToBackend(id, name, content, action) {
+            const payload = { id: id, name: name, html: content, action: action };
+            
+            // Standard CORS fetch to allow reading the response (status/errors)
+            const res = await fetch(API_URL, { 
+                method: 'POST', 
+                body: JSON.stringify(payload) 
+            });
+
+            if (!res.ok) {
+                throw new Error("Server Error: " + res.status);
+            }
+
+            const text = await res.text();
+            const json = JSON.parse(text);
+
+            if (json.status === "error") {
+                throw new Error(json.message);
+            }
         }
         
         function toggleSelectMode() {
@@ -253,12 +275,11 @@
         function toggleFileSelection(id, event) { event.stopPropagation(); if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); const chk = document.getElementById(`chk-${id}`); if(chk) chk.checked = selectedIds.has(id); }
         async function deleteFile() { if(!confirm("Are you sure?")) return; await saveToBackend(document.getElementById('fileId').value, null, null, 'delete'); resetEditor(); fetchList(); }
         async function bulkDelete() { if(selectedIds.size === 0) return; if(!confirm(`Delete ${selectedIds.size} files?`)) return; showOverlay("Deleting...", "fa-trash-can"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); await saveToBackend(ids[i], null, null, 'delete'); } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); resetEditor(); }
-        async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}`); const t = await res.text(); const file = JSON.parse(t); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
+        async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}&t=${new Date().getTime()}`); const t = await res.text(); const file = JSON.parse(t); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
         function manualSync() { const icon = document.querySelector('#btnSync i'); icon.classList.add('fa-spin'); fetchList().then(() => setTimeout(() => icon.classList.remove('fa-spin'), 500)); }
         function resetEditor() { document.getElementById('fileId').value = ''; document.getElementById('fileName').value = ''; document.getElementById('htmlCode').value = ''; document.getElementById('previewFrame').srcdoc = ""; document.getElementById('emptyPreview').classList.remove('hidden'); document.getElementById('btnDelete').classList.add('hidden'); document.getElementById('btnShare').classList.add('hidden'); document.getElementById('btnExternal').classList.add('hidden'); handleSearch(); }
         function cycleLayout() { layoutMode = (layoutMode + 1) % 3; const ed = document.getElementById('editorPane'); const pr = document.getElementById('previewPane'); const ic = document.getElementById('layoutIcon'); const tx = document.getElementById('layoutText'); ed.classList.remove('hidden', 'w-1/2', 'w-full'); pr.classList.remove('hidden', 'w-1/2', 'w-full'); if(layoutMode===0){ed.classList.add('w-1/2'); pr.classList.add('w-1/2'); ic.className="fa-solid fa-table-columns"; tx.innerText="Split";} else if(layoutMode===1){ed.classList.add('w-full'); pr.classList.add('hidden'); ic.className="fa-solid fa-code"; tx.innerText="Code";} else {ed.classList.add('hidden'); pr.classList.add('w-full'); ic.className="fa-solid fa-eye"; tx.innerText="Preview";} }
         async function handleBulkUpload(input) { const files = Array.from(input.files); if(files.length===0)return; showOverlay("Importing...", "fa-cloud-arrow-up"); for(let i=0; i<files.length; i++) { updateOverlay(i, files.length); const content = await new Promise(r => {const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsText(files[i]);}); const name = files[i].name.replace(/\.[^/.]+$/, ""); await saveToBackend(null, name, content, 'save'); } hideOverlay(); fetchList(); input.value=''; }
-        async function saveToBackend(id, name, content, action) { await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ id, name, html: content, action }) }); await new Promise(r => setTimeout(r, 600)); }
         function showOverlay(title, icon) { document.getElementById('bulkOverlay').classList.remove('hidden'); document.getElementById('bulkOverlay').classList.add('flex'); document.getElementById('bulkTitle').innerText = title; document.getElementById('bulkIcon').className = `fa-solid ${icon} text-4xl text-indigo-500 animate-bounce`; }
         function updateOverlay(cur, tot) { document.getElementById('bulkStatus').innerText = `${cur+1}/${tot}`; document.getElementById('bulkBar').style.width = Math.round((cur/tot)*100)+"%"; }
         function hideOverlay() { document.getElementById('bulkOverlay').classList.add('hidden'); document.getElementById('bulkOverlay').classList.remove('flex'); }
