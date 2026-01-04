@@ -11,34 +11,46 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
         .code-font { font-family: 'JetBrains Mono', monospace; }
-        
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-
-        /* Glassmorphism Sidebar */
+        
+        /* Glassmorphism */
         .glass-panel {
             background: rgba(30, 41, 59, 0.7);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
-
-        /* Loading Spinner */
+        
+        /* Loader */
         .loader { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #6366f1; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Smooth Fade */
+        /* Transitions */
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .layout-transition { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 
-        /* Iframe Container */
-        .preview-container { background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 20px 20px; background-color: #f8fafc; }
+        .preview-bg { background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 20px 20px; background-color: #f8fafc; }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden selection:bg-indigo-500 selection:text-white">
+
+    <div id="bulkOverlay" class="fixed inset-0 bg-slate-900/90 z-50 hidden flex-col items-center justify-center backdrop-blur-sm">
+        <div class="bg-slate-800 p-8 rounded-xl border border-white/10 shadow-2xl max-w-sm w-full text-center">
+            <div class="mb-4">
+                <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 animate-bounce"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Importing Files...</h3>
+            <p id="bulkStatus" class="text-slate-400 text-sm mb-6">Processing 1 of 5</p>
+            <div class="w-full bg-slate-700 rounded-full h-2 mb-2 overflow-hidden">
+                <div id="bulkBar" class="bg-indigo-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
 
     <aside class="w-72 glass-panel flex flex-col z-20 flex-shrink-0">
         <div class="p-5 border-b border-white/10">
@@ -51,7 +63,6 @@
                     <i class="fa-solid fa-rotate"></i>
                 </button>
             </div>
-            
             <div class="relative group">
                 <input type="text" id="searchBox" onkeyup="handleSearch()" placeholder="Search..." 
                     class="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-slate-200 placeholder-slate-500">
@@ -74,11 +85,17 @@
             </div>
         </div>
 
-        <div class="p-4 border-t border-white/10">
-            <button onclick="resetEditor()" class="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-medium rounded-lg transition flex justify-center items-center gap-2 group">
-                <i class="fa-solid fa-plus text-indigo-400 group-hover:scale-110 transition"></i>
-                <span>New Project</span>
+        <div class="p-4 border-t border-white/10 grid grid-cols-2 gap-3">
+            <button onclick="resetEditor()" class="py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-medium rounded-lg transition flex justify-center items-center gap-2 group">
+                <i class="fa-solid fa-plus text-indigo-400"></i>
+                <span>New</span>
             </button>
+            
+            <button onclick="document.getElementById('fileInput').click()" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition flex justify-center items-center gap-2 shadow-lg shadow-indigo-900/20">
+                <i class="fa-solid fa-upload"></i>
+                <span>Import</span>
+            </button>
+            <input type="file" id="fileInput" accept=".html,.htm,.txt" multiple class="hidden" onchange="handleBulkUpload(this)">
         </div>
     </aside>
 
@@ -93,13 +110,17 @@
             <div class="flex items-center gap-3">
                 <input type="hidden" id="fileId">
                 
+                <button onclick="cycleLayout()" class="text-slate-400 hover:text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 bg-white/5 border border-white/5 mr-2" title="Change View Mode">
+                    <i id="layoutIcon" class="fa-solid fa-table-columns"></i>
+                    <span id="layoutText" class="hidden md:inline">Split</span>
+                </button>
+
                 <button id="btnDelete" onclick="deleteFile()" class="hidden text-rose-400 hover:bg-rose-500/10 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
 
                 <button id="btnShare" onclick="shareLink()" class="hidden text-indigo-400 hover:bg-indigo-500/10 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-indigo-500/20">
                     <i class="fa-solid fa-share-nodes"></i>
-                    <span>Share</span>
                 </button>
 
                 <a id="btnExternal" href="#" target="_blank" class="hidden text-slate-400 hover:text-white px-3 py-2 rounded-lg text-sm transition" title="Open in New Tab">
@@ -114,12 +135,12 @@
             </div>
         </header>
 
-        <div class="flex-1 flex overflow-hidden">
+        <div class="flex-1 flex overflow-hidden relative">
             
-            <div class="w-1/2 flex flex-col border-r border-white/10">
-                <div class="bg-slate-800/50 px-4 py-1.5 flex justify-between items-center border-b border-white/5">
+            <div id="editorPane" class="w-1/2 flex flex-col border-r border-white/10 layout-transition relative z-10">
+                <div class="bg-slate-800/50 px-4 py-1.5 flex justify-between items-center border-b border-white/5 h-[30px]">
                     <span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                        <i class="fa-brands fa-html5 text-orange-500"></i> Source Code
+                        <i class="fa-brands fa-html5 text-orange-500"></i> Code
                     </span>
                     <span id="statusText" class="text-emerald-400 text-[10px] font-mono opacity-0 transition">Saved</span>
                 </div>
@@ -129,14 +150,14 @@
                     spellcheck="false"></textarea>
             </div>
 
-            <div class="w-1/2 flex flex-col bg-white">
-                <div class="bg-slate-100 px-4 py-1.5 border-b border-slate-200 flex justify-between items-center h-[29px]">
+            <div id="previewPane" class="w-1/2 flex flex-col bg-white layout-transition relative z-10">
+                <div class="bg-slate-100 px-4 py-1.5 border-b border-slate-200 flex justify-between items-center h-[30px]">
                     <span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                        <i class="fa-solid fa-eye text-indigo-500"></i> Live Preview
+                        <i class="fa-solid fa-eye text-indigo-500"></i> Preview
                     </span>
-                    <span class="text-[10px] text-slate-400">100%</span>
+                    <span class="text-[10px] text-slate-400">Live</span>
                 </div>
-                <div class="flex-1 preview-container relative">
+                <div class="flex-1 preview-bg relative">
                     <iframe id="previewFrame" class="w-full h-full border-none" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
                     <div id="emptyPreview" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
                         <i class="fa-solid fa-laptop-code text-4xl mb-2 opacity-20"></i>
@@ -153,14 +174,15 @@
         // --- CONFIGURATION ---
         const API_URL = "https://script.google.com/macros/s/AKfycbwP-9f52BgudGaUd-9ol0rsycAt83jcEh2e1euT3REKllQ_TOgYap7TcnHMUKmr2VlA/exec"; 
         
-        // --- STATE ---
         let libraryData = [];
         let previousDataString = "";
         let isSyncing = false;
+        
+        // Layout State: 0=Split, 1=Code, 2=Preview
+        let layoutMode = 0; 
 
         window.onload = function() {
             init();
-            // Auto-Refresh Loop (5 seconds)
             setInterval(fetchLibrarySilent, 5000);
         };
 
@@ -168,7 +190,116 @@
             fetchLibrarySilent();
         }
 
-        // --- CORE FUNCTIONS ---
+        // --- NEW: LAYOUT CYCLER ---
+        function cycleLayout() {
+            const editor = document.getElementById('editorPane');
+            const preview = document.getElementById('previewPane');
+            const icon = document.getElementById('layoutIcon');
+            const text = document.getElementById('layoutText');
+
+            layoutMode = (layoutMode + 1) % 3;
+
+            // Reset classes
+            editor.classList.remove('hidden', 'w-1/2', 'w-full', 'w-0');
+            preview.classList.remove('hidden', 'w-1/2', 'w-full', 'w-0');
+
+            if (layoutMode === 0) {
+                // SPLIT
+                editor.classList.add('w-1/2');
+                preview.classList.add('w-1/2');
+                icon.className = "fa-solid fa-table-columns";
+                text.innerText = "Split";
+            } else if (layoutMode === 1) {
+                // CODE ONLY
+                editor.classList.add('w-full');
+                preview.classList.add('hidden');
+                icon.className = "fa-solid fa-code";
+                text.innerText = "Code";
+            } else {
+                // PREVIEW ONLY
+                editor.classList.add('hidden');
+                preview.classList.add('w-full');
+                icon.className = "fa-solid fa-eye";
+                text.innerText = "Preview";
+            }
+        }
+
+        // --- NEW: BULK UPLOAD HANDLER ---
+        async function handleBulkUpload(input) {
+            const files = Array.from(input.files);
+            if (files.length === 0) return;
+
+            const overlay = document.getElementById('bulkOverlay');
+            const status = document.getElementById('bulkStatus');
+            const bar = document.getElementById('bulkBar');
+            
+            // Show Overlay
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // Update UI
+                const percent = Math.round(((i) / files.length) * 100);
+                status.innerText = `Importing "${file.name}" (${i+1} of ${files.length})`;
+                bar.style.width = percent + "%";
+
+                try {
+                    // Read file
+                    const content = await readFileAsync(file);
+                    const name = file.name.replace(/\.[^/.]+$/, ""); // remove extension
+
+                    // Send to GAS (Wait for it to finish before next one)
+                    await saveToBackend(null, name, content);
+                    
+                } catch (e) {
+                    console.error("Error uploading " + file.name, e);
+                }
+            }
+
+            // Finish
+            bar.style.width = "100%";
+            status.innerText = "All files imported!";
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+                manualSync(); // Refresh list
+                input.value = ''; // Reset input
+            }, 1000);
+        }
+
+        // Helper to read file as Promise
+        function readFileAsync(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsText(file);
+            });
+        }
+
+        // Helper to save to backend (Reused by Save Button and Bulk Upload)
+        async function saveToBackend(id, name, content) {
+            const payload = {
+                id: id,
+                name: name,
+                html: content,
+                action: 'save'
+            };
+            // We use no-cors to avoid CORS errors, but we can't read response.
+            // We assume success if no network error thrown.
+            await fetch(API_URL, { 
+                method: 'POST', 
+                mode: 'no-cors', 
+                body: JSON.stringify(payload) 
+            });
+            // Small delay to ensure GAS processes it
+            await new Promise(r => setTimeout(r, 800)); 
+        }
+
+
+        // --- STANDARD FUNCTIONS ---
 
         function manualSync() {
             const icon = document.querySelector('#btnSync i');
@@ -181,17 +312,14 @@
         async function fetchLibrarySilent() {
             if (isSyncing) return;
             isSyncing = true;
-            
             try {
                 const res = await fetch(API_URL + "?t=" + new Date().getTime());
                 const data = await res.json();
-                
                 const currentDataString = JSON.stringify(data);
                 if (currentDataString !== previousDataString) {
                     libraryData = data;
                     previousDataString = currentDataString;
                     handleSearch();
-                    
                     const now = new Date();
                     document.getElementById('syncStatus').innerText = "Synced " + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 }
@@ -199,9 +327,7 @@
                 console.error("Sync failed", e);
                 document.getElementById('syncStatus').innerText = "Offline";
                 document.getElementById('syncStatus').classList.add('text-rose-500');
-            } finally {
-                isSyncing = false;
-            }
+            } finally { isSyncing = false; }
         }
 
         function handleSearch() {
@@ -213,27 +339,17 @@
         function renderList(files) {
             const container = document.getElementById('fileList');
             container.innerHTML = '';
-            
             if (files.length === 0) {
                 container.innerHTML = '<div class="text-slate-600 text-sm text-center mt-10">No projects found</div>';
                 return;
             }
-
             const currentId = document.getElementById('fileId').value;
-
             files.forEach(file => {
                 const isSelected = file.id == currentId;
+                const activeClass = isSelected ? "bg-indigo-500/10 border-indigo-500/30" : "hover:bg-white/5 border-transparent hover:border-white/5";
                 const div = document.createElement('div');
-                
-                // Dynamic Classes for Selection
-                const baseClass = "group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex flex-col border border-transparent";
-                const activeClass = isSelected 
-                    ? "bg-indigo-500/10 border-indigo-500/30" 
-                    : "hover:bg-white/5 border-transparent hover:border-white/5";
-                
-                div.className = `${baseClass} ${activeClass} fade-in`;
+                div.className = `group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex flex-col border border-transparent fade-in ${activeClass}`;
                 div.onclick = () => loadFile(file.id);
-                
                 div.innerHTML = `
                     <div class="flex items-center gap-3">
                         <i class="fa-brands fa-html5 ${isSelected ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'} text-lg transition"></i>
@@ -241,8 +357,7 @@
                     </div>
                     <div class="text-[10px] text-slate-500 pl-8 mt-0.5 truncate flex justify-between">
                         <span>${new Date(file.date).toLocaleDateString()}</span>
-                    </div>
-                `;
+                    </div>`;
                 container.appendChild(div);
             });
         }
@@ -250,41 +365,31 @@
         function loadFile(id) {
             const file = libraryData.find(f => f.id == id);
             if (!file) return;
-
             document.getElementById('fileId').value = file.id;
             document.getElementById('fileName').value = file.name;
             document.getElementById('htmlCode').value = file.html;
-
-            // Trigger internal preview
+            
             updatePreview();
-
-            // Highlight in list
-            handleSearch();
-
-            // Show Toolbar Actions
+            handleSearch(); // Refresh list highlight
+            
             document.getElementById('btnDelete').classList.remove('hidden');
             document.getElementById('btnShare').classList.remove('hidden');
             
-            // External Link
             const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
             const extBtn = document.getElementById('btnExternal');
             extBtn.href = `${baseUrl}/view.html?id=${id}`;
             extBtn.classList.remove('hidden');
         }
 
-        // --- PREVIEW LOGIC (The iframe magic) ---
         function updatePreview() {
             const code = document.getElementById('htmlCode').value;
             const iframe = document.getElementById('previewFrame');
-            const emptyState = document.getElementById('emptyPreview');
-
             if (!code.trim()) {
-                emptyState.classList.remove('hidden');
+                document.getElementById('emptyPreview').classList.remove('hidden');
                 iframe.srcdoc = "";
                 return;
             }
-
-            emptyState.classList.add('hidden');
+            document.getElementById('emptyPreview').classList.add('hidden');
             iframe.srcdoc = code;
         }
 
@@ -292,59 +397,53 @@
             document.getElementById('fileId').value = '';
             document.getElementById('fileName').value = '';
             document.getElementById('htmlCode').value = '';
-            
-            // Clear Preview
             document.getElementById('previewFrame').srcdoc = "";
             document.getElementById('emptyPreview').classList.remove('hidden');
-
             document.getElementById('btnDelete').classList.add('hidden');
             document.getElementById('btnShare').classList.add('hidden');
             document.getElementById('btnExternal').classList.add('hidden');
             handleSearch();
         }
 
-        // --- SHARE ---
         function shareLink() {
             const id = document.getElementById('fileId').value;
             if (!id) return;
             const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
             const shareUrl = `${baseUrl}/view.html?id=${id}`;
-
             navigator.clipboard.writeText(shareUrl).then(() => {
-                const btn = document.querySelector('#btnShare span');
-                const originalText = btn.innerText;
-                btn.innerText = "Copied!";
-                setTimeout(() => btn.innerText = originalText, 2000);
+                const btn = document.querySelector('#btnShare');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = `<i class="fa-solid fa-check text-green-400"></i>`;
+                setTimeout(() => btn.innerHTML = originalHtml, 2000);
             });
         }
 
-        // --- SERVER ACTIONS ---
         async function saveFile() {
             const btn = document.getElementById('btnSave');
             const loader = document.getElementById('saveLoader');
             const status = document.getElementById('statusText');
+            
+            // Gather Data
+            const id = document.getElementById('fileId').value;
+            const name = document.getElementById('fileName').value || "Untitled";
+            const content = document.getElementById('htmlCode').value;
 
-            const payload = {
-                id: document.getElementById('fileId').value,
-                name: document.getElementById('fileName').value || "Untitled",
-                html: document.getElementById('htmlCode').value,
-                action: 'save'
-            };
-
+            // UI Feedback
             btn.disabled = true;
             btn.classList.add('opacity-75');
             loader.classList.remove('hidden');
             btn.querySelector('span').innerText = "Saving";
 
             try {
-                await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                // Use the shared save function
+                await saveToBackend(id, name, content);
                 
                 setTimeout(() => {
-                    manualSync(); // Force immediate refresh
-                    status.style.opacity = '1';
+                    manualSync(); // Force update sidebar
+                    status.style.opacity = '1'; // Show green "Saved" text
                     setTimeout(() => status.style.opacity = '0', 3000);
                     btn.querySelector('span').innerText = "Save";
-                }, 1500);
+                }, 500);
 
             } catch (e) {
                 alert("Save failed.");
@@ -357,9 +456,15 @@
         }
 
         async function deleteFile() {
-            if(!confirm("Are you sure?")) return;
+            if(!confirm("Are you sure you want to delete this project?")) return;
             const id = document.getElementById('fileId').value;
-            await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ id: id, action: 'delete' }) });
+            
+            await fetch(API_URL, { 
+                method: 'POST', 
+                mode: 'no-cors', 
+                body: JSON.stringify({ id: id, action: 'delete' }) 
+            });
+            
             setTimeout(() => { resetEditor(); manualSync(); }, 1000);
         }
     </script>
