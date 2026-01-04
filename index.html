@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Html Library</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom Scrollbar for the dark editor */
+        .dark-scroll::-webkit-scrollbar { width: 8px; }
+        .dark-scroll::-webkit-scrollbar-track { background: #1e293b; }
+        .dark-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        /* Spinner */
+        .loader { border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-white border-r flex flex-col z-10 shadow-sm">
+        <div class="p-5 border-b flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-200">H</div>
+            <h1 class="font-bold text-gray-800 tracking-tight">Html Library</h1>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 space-y-2" id="fileList">
+            <div class="text-center text-gray-400 text-sm mt-10">Loading Library...</div>
+        </div>
+
+        <div class="p-4 border-t bg-gray-50">
+            <button onclick="resetEditor()" class="w-full py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 hover:text-indigo-600 transition shadow-sm flex justify-center items-center gap-2">
+                <span class="text-xl leading-none">+</span> New Project
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative">
+        
+        <header class="h-16 bg-white border-b flex items-center justify-between px-6">
+            <input type="text" id="fileName" placeholder="Untitled Project" 
+                class="text-lg font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 rounded px-2 w-1/3 transition">
+            
+            <div class="flex items-center gap-3">
+                <input type="hidden" id="fileId">
+                
+                <button id="btnDelete" onclick="deleteFile()" class="hidden text-red-500 hover:bg-red-50 px-3 py-2 rounded text-sm font-medium transition">
+                    Delete
+                </button>
+
+                <a id="btnPreview" href="#" target="_blank" class="hidden flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    Open Page
+                </a>
+
+                <button onclick="saveFile()" id="btnSave" class="bg-gray-900 hover:bg-black text-white px-6 py-2 rounded-lg text-sm font-medium shadow-lg shadow-gray-200 transition flex items-center gap-2">
+                    <span>Save Changes</span>
+                    <div id="saveLoader" class="loader hidden"></div>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 bg-gray-900 p-4 relative overflow-hidden flex flex-col">
+            <div class="text-gray-500 text-xs font-mono mb-2 uppercase tracking-wider flex justify-between">
+                <span>Editor (HTML/CSS/JS)</span>
+                <span id="statusText" class="text-green-400 opacity-0 transition">Saved!</span>
+            </div>
+            <textarea id="htmlCode" 
+                class="code-font flex-1 w-full bg-gray-800 text-gray-300 p-4 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none dark-scroll text-sm leading-relaxed" 
+                placeholder="" 
+                spellcheck="false"></textarea>
+        </div>
+
+    </main>
+
+    <script>
+        // ----------------------------------------------------
+        // 1. PASTE YOUR GOOGLE SCRIPT URL HERE
+        // ----------------------------------------------------
+        const API_URL = "https://script.google.com/macros/s/AKfycbwP-9f52BgudGaUd-9ol0rsycAt83jcEh2e1euT3REKllQ_TOgYap7TcnHMUKmr2VlA/exec"; 
+        // ----------------------------------------------------
+
+        let libraryData = [];
+
+        window.onload = init;
+
+        function init() {
+            fetchLibrary();
+        }
+
+        async function fetchLibrary() {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                libraryData = data;
+                renderList(data);
+            } catch (e) {
+                console.error(e);
+                document.getElementById('fileList').innerHTML = '<div class="text-red-500 text-center text-sm p-4">Connection Failed</div>';
+            }
+        }
+
+        function renderList(files) {
+            const container = document.getElementById('fileList');
+            container.innerHTML = '';
+
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.className = "group px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 transition flex flex-col";
+                div.onclick = () => loadFile(file.id);
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500 group-hover:scale-125 transition"></span>
+                        <span class="text-sm font-medium text-gray-700 group-hover:text-indigo-700 truncate">${file.name}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-400 pl-4 mt-0.5 truncate">${new Date(file.date).toLocaleDateString()}</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function loadFile(id) {
+            const file = libraryData.find(f => f.id == id);
+            if (!file) return;
+
+            document.getElementById('fileId').value = file.id;
+            document.getElementById('fileName').value = file.name;
+            document.getElementById('htmlCode').value = file.html;
+
+            // Setup Buttons
+            const previewBtn = document.getElementById('btnPreview');
+            previewBtn.classList.remove('hidden');
+            previewBtn.href = `${API_URL}?preview=${file.id}`;
+
+            document.getElementById('btnDelete').classList.remove('hidden');
+        }
+
+        function resetEditor() {
+            document.getElementById('fileId').value = '';
+            document.getElementById('fileName').value = '';
+            document.getElementById('htmlCode').value = '';
+            document.getElementById('btnPreview').classList.add('hidden');
+            document.getElementById('btnDelete').classList.add('hidden');
+        }
+
+        async function saveFile() {
+            const btn = document.getElementById('btnSave');
+            const loader = document.getElementById('saveLoader');
+            const status = document.getElementById('statusText');
+
+            const payload = {
+                id: document.getElementById('fileId').value,
+                name: document.getElementById('fileName').value || "Untitled",
+                html: document.getElementById('htmlCode').value,
+                action: 'save'
+            };
+
+            // Loading State
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+            loader.classList.remove('hidden');
+
+            try {
+                // Using no-cors for simplicity with GAS
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(payload)
+                });
+
+                // Fake delay to allow Sheet to update
+                setTimeout(() => {
+                    fetchLibrary(); // Refresh list
+                    status.style.opacity = '1'; // Show saved toast
+                    setTimeout(() => status.style.opacity = '0', 2000);
+                }, 1500);
+
+            } catch (e) {
+                alert("Save failed");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+                loader.classList.add('hidden');
+            }
+        }
+
+        async function deleteFile() {
+            if(!confirm("Permanently delete this file?")) return;
+
+            const id = document.getElementById('fileId').value;
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ id: id, action: 'delete' })
+            });
+
+            setTimeout(() => {
+                resetEditor();
+                fetchLibrary();
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
