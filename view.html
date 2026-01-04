@@ -33,8 +33,8 @@
     <span id="msg">Loading shared page...</span>
 
     <script>
-        // --- UPDATED API URL ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbwBR-E2y07UQvrmyCYqxGLPVe29P4cAKSw6isYa7UA83gRyK5zCAWgPqYHigSz03NuOBA/exec"; 
+        // --- YOUR LATEST API URL ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbxDJCn7gAUvoJf6Jwvi7HzjsThJbruR8jZqretqsCvGT0zyZLO1098-bpzyTDjMPqAV0w/exec"; 
 
         async function loadPage() {
             const params = new URLSearchParams(window.location.search);
@@ -46,10 +46,10 @@
             }
 
             try {
-                // Fetch specific ID
+                // Fetch the specific file by ID
                 const res = await fetch(`${API_URL}?id=${id}&t=${new Date().getTime()}`);
                 
-                // Parse as Text first (CORS fix)
+                // CRITICAL: Parse response as Text first to bypass strict CORS checks
                 const text = await res.text();
                 let file;
                 
@@ -59,13 +59,14 @@
                     throw new Error("Invalid Data received from server");
                 }
 
+                // Render the HTML
                 if (file && file.html) {
                     document.open();
                     document.write(file.html);
                     document.close();
                     document.title = file.name;
                 } else {
-                    document.getElementById('msg').innerText = "Error: File not found.";
+                    document.getElementById('msg').innerText = "Error: File not found (It may have been deleted).";
                     document.querySelector('.loader').style.display = 'none';
                 }
             } catch (e) {
