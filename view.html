@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading Content...</title>
+    <style>
+        /* Simple clean loading screen */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+            background: #f8fafc; 
+            color: #64748b; 
+        }
+        .loader { 
+            border: 3px solid #e2e8f0; 
+            border-top: 3px solid #4f46e5; /* Indigo-600 */
+            border-radius: 50%; 
+            width: 30px; 
+            height: 30px; 
+            animation: spin 0.8s linear infinite; 
+            margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="loader"></div>
+    <span id="msg">Loading shared page...</span>
+
+    <script>
+        // --- YOUR WEBHOOK URL ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbwP-9f52BgudGaUd-9ol0rsycAt83jcEh2e1euT3REKllQ_TOgYap7TcnHMUKmr2VlA/exec"; 
+        // ------------------------
+
+        async function loadPage() {
+            // 1. Get the ID from the URL link (e.g. ?id=12345)
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+
+            if (!id) {
+                document.getElementById('msg').innerText = "Error: No Page ID specified in the link.";
+                return;
+            }
+
+            try {
+                // 2. Fetch data from your Google Sheet
+                // We request 'preview' mode logic if supported, or filter the full list
+                const res = await fetch(API_URL + "?t=" + new Date().getTime()); 
+                const data = await res.json();
+                
+                // 3. Find the matching file
+                const file = data.find(f => f.id == id);
+
+                if (file) {
+                    // 4. Wipe this loading page and replace it with the saved HTML
+                    document.open();
+                    document.write(file.html);
+                    document.close();
+                    
+                    // Set the browser tab title
+                    document.title = file.name;
+                } else {
+                    document.getElementById('msg').innerText = "Error: File not found (it may have been deleted).";
+                    document.querySelector('.loader').style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('msg').innerText = "Connection Error. Please try refreshing.";
+                console.error(e);
+            }
+        }
+
+        // Run immediately
+        loadPage();
+    </script>
+</body>
+</html>
