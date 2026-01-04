@@ -22,8 +22,6 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .layout-transition { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
         .preview-bg { background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 20px 20px; background-color: #f8fafc; }
-        
-        /* Checkbox */
         .custom-checkbox { appearance: none; background-color: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); width: 18px; height: 18px; border-radius: 4px; display: grid; place-content: center; cursor: pointer; transition: all 0.2s; }
         .custom-checkbox::before { content: "\f00c"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 10px; color: white; transform: scale(0); transition: 0.2s transform; }
         .custom-checkbox:checked { background-color: #6366f1; border-color: #6366f1; }
@@ -58,11 +56,16 @@
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 group-focus-within:text-indigo-400 transition text-xs"></i>
             </div>
         </div>
+        
         <div class="flex-1 overflow-y-auto p-2 space-y-1" id="fileList">
-            <div class="mt-10 text-center text-slate-500 text-sm flex flex-col items-center gap-3"><div class="loader"></div><span>Loading List...</span></div>
+            <div class="mt-10 text-center text-slate-500 text-sm flex flex-col items-center gap-3">
+                <div class="loader"></div>
+                <span>Initializing...</span>
+            </div>
         </div>
+
         <div class="px-4 py-2 border-t border-white/10 bg-slate-900/50 text-[10px] text-slate-400 flex justify-between items-center">
-            <span id="syncStatus" class="truncate max-w-[150px]">Ready</span>
+            <span id="syncStatus" class="truncate max-w-[150px]">Connecting...</span>
             <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span><span>Online</span></div>
         </div>
         <div class="p-4 border-t border-white/10">
@@ -120,17 +123,25 @@
         window.onload = function() { init(); setInterval(fetchList, 5000); };
         function init() { fetchList(); }
 
-        // --- FETCH ONLY THE LIST (Fast) ---
+        // --- FETCH LIST ---
         async function fetchList() {
             if (isSyncing) return;
             isSyncing = true;
             try {
-                // Fetch list only (no HTML content)
                 const res = await fetch(API_URL + "?t=" + new Date().getTime());
-                if(!res.ok) throw new Error("Server Error");
-                const data = await res.json();
+                if(!res.ok) throw new Error("Server Status: " + res.status);
                 
-                // Compare with current list
+                // Parse text
+                const text = await res.text();
+                let data = JSON.parse(text);
+
+                // *** CRITICAL FIX: SANITIZE DATA ***
+                // Force all names to be Strings to prevent crash on numbers (e.g., name: 12)
+                data = data.map(item => ({
+                    ...item,
+                    name: String(item.name) // Convert 12 -> "12"
+                }));
+
                 const currentDataString = JSON.stringify(data);
                 if (currentDataString !== previousDataString) {
                     libraryData = data;
@@ -141,32 +152,33 @@
                     document.getElementById('syncStatus').className = "truncate max-w-[150px] text-emerald-400";
                 }
             } catch (e) {
-                document.getElementById('syncStatus').innerText = "Offline";
+                document.getElementById('syncStatus').innerText = "Error";
                 document.getElementById('syncStatus').className = "truncate max-w-[150px] text-rose-500";
-                if(libraryData.length === 0) document.getElementById('fileList').innerHTML = `<div class="mt-10 text-center text-rose-400 text-sm">Connection Failed<br><button onclick="init()" class="mt-2 underline">Retry</button></div>`;
+                // Show specific error on screen
+                if(libraryData.length === 0) {
+                   document.getElementById('fileList').innerHTML = `<div class="p-4 text-center text-rose-400 text-xs">${e.message}<br><button onclick="init()" class="mt-2 underline">Retry</button></div>`;
+                }
             } finally { isSyncing = false; }
         }
 
-        // --- LOAD SINGLE FILE CONTENT (Heavy) ---
+        // --- LOAD SINGLE FILE ---
         async function loadFile(id) {
-            // 1. Setup UI
             const fileMeta = libraryData.find(f => f.id == id);
             if (!fileMeta) return;
             
             document.getElementById('fileId').value = fileMeta.id;
             document.getElementById('fileName').value = fileMeta.name;
             document.getElementById('htmlCode').value = "Loading code...";
-            document.getElementById('editorOverlay').classList.remove('hidden'); // Show spinner
+            document.getElementById('editorOverlay').classList.remove('hidden');
             
-            // 2. Fetch full content
             try {
                 const res = await fetch(`${API_URL}?id=${id}&t=${new Date().getTime()}`);
-                const fullData = await res.json();
+                const text = await res.text();
+                const fullData = JSON.parse(text);
                 
                 document.getElementById('htmlCode').value = fullData.html || "";
                 updatePreview();
                 
-                // Show Actions
                 document.getElementById('btnDelete').classList.remove('hidden');
                 document.getElementById('btnShare').classList.remove('hidden');
                 const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
@@ -174,17 +186,17 @@
                 extBtn.href = `${baseUrl}/view.html?id=${id}`;
                 extBtn.classList.remove('hidden');
             } catch(e) {
-                document.getElementById('htmlCode').value = "Error loading file content.";
+                document.getElementById('htmlCode').value = "Error loading content.";
             } finally {
-                document.getElementById('editorOverlay').classList.add('hidden'); // Hide spinner
-                handleSearch(); // Update sidebar highlight
+                document.getElementById('editorOverlay').classList.add('hidden');
+                handleSearch();
             }
         }
 
         // --- UI & LOGIC ---
         function handleSearch() {
             const term = document.getElementById('searchBox').value.toLowerCase();
-            const filtered = libraryData.filter(f => f.name.toLowerCase().includes(term));
+            const filtered = libraryData.filter(f => String(f.name).toLowerCase().includes(term));
             renderList(filtered);
         }
 
@@ -204,11 +216,7 @@
                 div.className = `group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex items-center gap-3 border border-transparent fade-in ${activeClass}`;
                 
                 if (isSelectionMode) {
-                    div.onclick = (e) => {
-                        const chk = document.getElementById(`chk-${file.id}`);
-                        chk.checked = !chk.checked;
-                        toggleFileSelection(file.id, e);
-                    };
+                    div.onclick = (e) => { const chk = document.getElementById(`chk-${file.id}`); chk.checked = !chk.checked; toggleFileSelection(file.id, e); };
                     const checked = selectedIds.has(file.id) ? "checked" : "";
                     div.innerHTML = `<div class="flex-shrink-0 w-6 flex justify-center"><input type="checkbox" id="chk-${file.id}" class="custom-checkbox" ${checked} onchange="toggleFileSelection('${file.id}', event)"></div><div class="flex-1 min-w-0"><div class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate">${file.name}</div><div class="text-[10px] text-slate-500 mt-0.5">${dateStr}</div></div>`;
                 } else {
@@ -238,7 +246,6 @@
             finally { btn.disabled = false; btn.classList.remove('opacity-75'); document.getElementById('saveLoader').classList.add('hidden'); }
         }
         
-        // --- HELPERS (Bulk, Delete, Reset, etc) ---
         function toggleSelectMode() {
             isSelectionMode = !isSelectionMode; selectedIds.clear(); 
             const btn = document.getElementById('btnSelectMode');
@@ -249,7 +256,7 @@
         function toggleFileSelection(id, event) { event.stopPropagation(); if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); const chk = document.getElementById(`chk-${id}`); if(chk) chk.checked = selectedIds.has(id); }
         async function deleteFile() { if(!confirm("Are you sure?")) return; await saveToBackend(document.getElementById('fileId').value, null, null, 'delete'); resetEditor(); fetchList(); }
         async function bulkDelete() { if(selectedIds.size === 0) return; if(!confirm(`Delete ${selectedIds.size} files?`)) return; showOverlay("Deleting...", "fa-trash-can"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); await saveToBackend(ids[i], null, null, 'delete'); } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); resetEditor(); }
-        async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}`); const file = await res.json(); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
+        async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}`); const t = await res.text(); const file = JSON.parse(t); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
         function manualSync() { const icon = document.querySelector('#btnSync i'); icon.classList.add('fa-spin'); fetchList().then(() => setTimeout(() => icon.classList.remove('fa-spin'), 500)); }
         function resetEditor() { document.getElementById('fileId').value = ''; document.getElementById('fileName').value = ''; document.getElementById('htmlCode').value = ''; document.getElementById('previewFrame').srcdoc = ""; document.getElementById('emptyPreview').classList.remove('hidden'); document.getElementById('btnDelete').classList.add('hidden'); document.getElementById('btnShare').classList.add('hidden'); document.getElementById('btnExternal').classList.add('hidden'); handleSearch(); }
         function cycleLayout() { layoutMode = (layoutMode + 1) % 3; const ed = document.getElementById('editorPane'); const pr = document.getElementById('previewPane'); const ic = document.getElementById('layoutIcon'); const tx = document.getElementById('layoutText'); ed.classList.remove('hidden', 'w-1/2', 'w-full'); pr.classList.remove('hidden', 'w-1/2', 'w-full'); if(layoutMode===0){ed.classList.add('w-1/2'); pr.classList.add('w-1/2'); ic.className="fa-solid fa-table-columns"; tx.innerText="Split";} else if(layoutMode===1){ed.classList.add('w-full'); pr.classList.add('hidden'); ic.className="fa-solid fa-code"; tx.innerText="Code";} else {ed.classList.add('hidden'); pr.classList.add('w-full'); ic.className="fa-solid fa-eye"; tx.innerText="Preview";} }
