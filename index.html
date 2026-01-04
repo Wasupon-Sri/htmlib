@@ -16,7 +16,6 @@
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
         
-        /* Glassmorphism */
         .glass-panel {
             background: rgba(30, 41, 59, 0.7);
             backdrop-filter: blur(12px);
@@ -24,17 +23,44 @@
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        /* Loader */
         .loader { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #6366f1; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Transitions */
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         
         .layout-transition { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-
         .preview-bg { background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 20px 20px; background-color: #f8fafc; }
+
+        /* Checkbox Custom Style */
+        .custom-checkbox {
+            appearance: none;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .custom-checkbox::before {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 10px;
+            color: white;
+            transform: scale(0);
+            transition: 0.2s transform;
+        }
+        .custom-checkbox:checked {
+            background-color: #6366f1;
+            border-color: #6366f1;
+        }
+        .custom-checkbox:checked::before {
+            transform: scale(1);
+        }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden selection:bg-indigo-500 selection:text-white">
@@ -42,27 +68,33 @@
     <div id="bulkOverlay" class="fixed inset-0 bg-slate-900/90 z-50 hidden flex-col items-center justify-center backdrop-blur-sm">
         <div class="bg-slate-800 p-8 rounded-xl border border-white/10 shadow-2xl max-w-sm w-full text-center">
             <div class="mb-4">
-                <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-500 animate-bounce"></i>
+                <i id="bulkIcon" class="fa-solid fa-layer-group text-4xl text-indigo-500 animate-bounce"></i>
             </div>
-            <h3 class="text-xl font-bold text-white mb-2">Importing Files...</h3>
-            <p id="bulkStatus" class="text-slate-400 text-sm mb-6">Processing 1 of 5</p>
+            <h3 id="bulkTitle" class="text-xl font-bold text-white mb-2">Processing...</h3>
+            <p id="bulkStatus" class="text-slate-400 text-sm mb-6">Please wait</p>
             <div class="w-full bg-slate-700 rounded-full h-2 mb-2 overflow-hidden">
                 <div id="bulkBar" class="bg-indigo-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
         </div>
     </div>
 
-    <aside class="w-72 glass-panel flex flex-col z-20 flex-shrink-0">
+    <aside class="w-80 glass-panel flex flex-col z-20 flex-shrink-0">
         <div class="p-5 border-b border-white/10">
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/30">H</div>
                     <h1 class="font-bold text-lg tracking-tight text-white">Html Library</h1>
                 </div>
-                <button onclick="manualSync()" id="btnSync" class="text-gray-400 hover:text-white transition p-2 rounded-full hover:bg-white/10" title="Sync Now">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="toggleSelectMode()" id="btnSelectMode" class="text-slate-400 hover:text-white transition p-2 rounded-lg hover:bg-white/10 border border-transparent" title="Select Files">
+                        <i class="fa-solid fa-list-check"></i>
+                    </button>
+                    <button onclick="manualSync()" id="btnSync" class="text-slate-400 hover:text-white transition p-2 rounded-lg hover:bg-white/10" title="Sync Now">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
             </div>
+            
             <div class="relative group">
                 <input type="text" id="searchBox" onkeyup="handleSearch()" placeholder="Search..." 
                     class="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-slate-200 placeholder-slate-500">
@@ -77,7 +109,7 @@
             </div>
         </div>
 
-        <div class="px-4 py-3 border-t border-white/10 bg-slate-900/50 text-[10px] text-slate-400 flex justify-between items-center">
+        <div class="px-4 py-2 border-t border-white/10 bg-slate-900/50 text-[10px] text-slate-400 flex justify-between items-center">
             <span id="syncStatus" class="truncate max-w-[150px]">Ready</span>
             <div class="flex items-center gap-2">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
@@ -85,22 +117,35 @@
             </div>
         </div>
 
-        <div class="p-4 border-t border-white/10 grid grid-cols-2 gap-3">
-            <button onclick="resetEditor()" class="py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-medium rounded-lg transition flex justify-center items-center gap-2 group">
-                <i class="fa-solid fa-plus text-indigo-400"></i>
-                <span>New</span>
-            </button>
+        <div class="p-4 border-t border-white/10">
             
-            <button onclick="document.getElementById('fileInput').click()" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition flex justify-center items-center gap-2 shadow-lg shadow-indigo-900/20">
-                <i class="fa-solid fa-upload"></i>
-                <span>Import</span>
-            </button>
-            <input type="file" id="fileInput" accept=".html,.htm,.txt" multiple class="hidden" onchange="handleBulkUpload(this)">
+            <div id="actionsStandard" class="grid grid-cols-2 gap-3">
+                <button onclick="resetEditor()" class="py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-medium rounded-lg transition flex justify-center items-center gap-2 group">
+                    <i class="fa-solid fa-plus text-indigo-400"></i>
+                    <span>New</span>
+                </button>
+                <button onclick="document.getElementById('fileInput').click()" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition flex justify-center items-center gap-2 shadow-lg shadow-indigo-900/20">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>Import</span>
+                </button>
+                <input type="file" id="fileInput" accept=".html,.htm,.txt" multiple class="hidden" onchange="handleBulkUpload(this)">
+            </div>
+
+            <div id="actionsSelection" class="hidden grid-cols-2 gap-3">
+                <button onclick="bulkDuplicate()" class="py-2.5 bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 text-sky-400 font-medium rounded-lg transition flex justify-center items-center gap-2">
+                    <i class="fa-regular fa-copy"></i>
+                    <span>Duplicate</span>
+                </button>
+                <button onclick="bulkDelete()" class="py-2.5 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-400 font-medium rounded-lg transition flex justify-center items-center gap-2">
+                    <i class="fa-regular fa-trash-can"></i>
+                    <span>Delete</span>
+                </button>
+            </div>
+
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col relative bg-slate-900">
-        
         <header class="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-slate-900/95 backdrop-blur z-10">
             <div class="flex-1 max-w-md">
                 <input type="text" id="fileName" placeholder="Untitled Project" 
@@ -136,7 +181,6 @@
         </header>
 
         <div class="flex-1 flex overflow-hidden relative">
-            
             <div id="editorPane" class="w-1/2 flex flex-col border-r border-white/10 layout-transition relative z-10">
                 <div class="bg-slate-800/50 px-4 py-1.5 flex justify-between items-center border-b border-white/5 h-[30px]">
                     <span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 flex items-center gap-2">
@@ -165,111 +209,261 @@
                     </div>
                 </div>
             </div>
-
         </div>
-
     </main>
 
     <script>
         // --- CONFIGURATION ---
         const API_URL = "https://script.google.com/macros/s/AKfycbwP-9f52BgudGaUd-9ol0rsycAt83jcEh2e1euT3REKllQ_TOgYap7TcnHMUKmr2VlA/exec"; 
-        
+
+        // --- STATE ---
         let libraryData = [];
         let previousDataString = "";
         let isSyncing = false;
-        
-        // Layout State: 0=Split, 1=Code, 2=Preview
         let layoutMode = 0; 
+        
+        // Selection State
+        let isSelectionMode = false;
+        let selectedIds = new Set();
 
         window.onload = function() {
             init();
             setInterval(fetchLibrarySilent, 5000);
         };
 
-        function init() {
-            fetchLibrarySilent();
-        }
+        function init() { fetchLibrarySilent(); }
 
-        // --- NEW: LAYOUT CYCLER ---
-        function cycleLayout() {
-            const editor = document.getElementById('editorPane');
-            const preview = document.getElementById('previewPane');
-            const icon = document.getElementById('layoutIcon');
-            const text = document.getElementById('layoutText');
+        // --- UI LOGIC: SELECTION MODE ---
+        
+        function toggleSelectMode() {
+            isSelectionMode = !isSelectionMode;
+            selectedIds.clear(); // Clear selection when toggling
+            
+            const btn = document.getElementById('btnSelectMode');
+            const actionStd = document.getElementById('actionsStandard');
+            const actionSel = document.getElementById('actionsSelection');
 
-            layoutMode = (layoutMode + 1) % 3;
-
-            // Reset classes
-            editor.classList.remove('hidden', 'w-1/2', 'w-full', 'w-0');
-            preview.classList.remove('hidden', 'w-1/2', 'w-full', 'w-0');
-
-            if (layoutMode === 0) {
-                // SPLIT
-                editor.classList.add('w-1/2');
-                preview.classList.add('w-1/2');
-                icon.className = "fa-solid fa-table-columns";
-                text.innerText = "Split";
-            } else if (layoutMode === 1) {
-                // CODE ONLY
-                editor.classList.add('w-full');
-                preview.classList.add('hidden');
-                icon.className = "fa-solid fa-code";
-                text.innerText = "Code";
+            if (isSelectionMode) {
+                btn.classList.add('text-indigo-400', 'bg-white/10', 'border-indigo-500/50');
+                actionStd.classList.remove('grid'); actionStd.classList.add('hidden');
+                actionSel.classList.remove('hidden'); actionSel.classList.add('grid');
             } else {
-                // PREVIEW ONLY
-                editor.classList.add('hidden');
-                preview.classList.add('w-full');
-                icon.className = "fa-solid fa-eye";
-                text.innerText = "Preview";
+                btn.classList.remove('text-indigo-400', 'bg-white/10', 'border-indigo-500/50');
+                actionStd.classList.remove('hidden'); actionStd.classList.add('grid');
+                actionSel.classList.remove('grid'); actionSel.classList.add('hidden');
             }
+            handleSearch(); // Re-render list with/without checkboxes
         }
 
-        // --- NEW: BULK UPLOAD HANDLER ---
+        function toggleFileSelection(id, event) {
+            event.stopPropagation(); // Prevent opening the file
+            if (selectedIds.has(id)) {
+                selectedIds.delete(id);
+            } else {
+                selectedIds.add(id);
+            }
+            // Just update visual state of checkbox
+            const checkbox = document.getElementById(`chk-${id}`);
+            if(checkbox) checkbox.checked = selectedIds.has(id);
+        }
+
+        // --- BULK OPERATIONS ---
+
+        async function bulkDelete() {
+            if (selectedIds.size === 0) return alert("No files selected.");
+            if (!confirm(`Delete ${selectedIds.size} files permanently?`)) return;
+
+            showOverlay("Deleting Files...", "fa-trash-can");
+            const idsToDelete = Array.from(selectedIds);
+            
+            for (let i = 0; i < idsToDelete.length; i++) {
+                updateOverlay(i, idsToDelete.length, "Deleting...");
+                await saveToBackend(idsToDelete[i], null, null, 'delete');
+            }
+
+            hideOverlay();
+            isSelectionMode = false; // Exit mode
+            toggleSelectMode(); // Update UI
+            manualSync();
+            resetEditor();
+        }
+
+        async function bulkDuplicate() {
+            if (selectedIds.size === 0) return alert("No files selected.");
+            
+            showOverlay("Duplicating...", "fa-copy");
+            const idsToDup = Array.from(selectedIds);
+
+            for (let i = 0; i < idsToDup.length; i++) {
+                const id = idsToDup[i];
+                const original = libraryData.find(f => f.id == id);
+                if (!original) continue;
+
+                updateOverlay(i, idsToDup.length, `Duplicating "${original.name}"`);
+
+                // Generate new Name (Simple Increment)
+                let newName = original.name + " (1)";
+                let counter = 1;
+                // Check if name exists in current libraryData
+                while (libraryData.some(f => f.name === newName)) {
+                    counter++;
+                    // Regex to replace existing (n) or append new one
+                    if (/\(\d+\)$/.test(original.name)) {
+                        newName = original.name.replace(/\(\d+\)$/, ` (${counter})`);
+                    } else {
+                        newName = original.name + ` (${counter})`;
+                    }
+                }
+
+                await saveToBackend(null, newName, original.html, 'save');
+            }
+
+            hideOverlay();
+            isSelectionMode = false;
+            toggleSelectMode();
+            manualSync();
+        }
+
+        // --- RENDERING ---
+
+        function handleSearch() {
+            const term = document.getElementById('searchBox').value.toLowerCase();
+            const filtered = libraryData.filter(f => f.name.toLowerCase().includes(term));
+            renderList(filtered);
+        }
+
+        function renderList(files) {
+            const container = document.getElementById('fileList');
+            container.innerHTML = '';
+            
+            if (files.length === 0) {
+                container.innerHTML = '<div class="text-slate-600 text-sm text-center mt-10">No projects found</div>';
+                return;
+            }
+
+            const currentId = document.getElementById('fileId').value;
+
+            files.forEach(file => {
+                const isSelected = file.id == currentId;
+                const div = document.createElement('div');
+                const activeClass = isSelected ? "bg-indigo-500/10 border-indigo-500/30" : "hover:bg-white/5 border-transparent hover:border-white/5";
+                
+                // Format Date (Jan 4, 14:30)
+                const dateObj = new Date(file.date);
+                const dateStr = dateObj.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }) + ", " + 
+                                dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+                div.className = `group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex items-center gap-3 border border-transparent fade-in ${activeClass}`;
+                
+                // Click behavior depends on mode
+                if (isSelectionMode) {
+                    div.onclick = (e) => {
+                        const chk = document.getElementById(`chk-${file.id}`);
+                        chk.checked = !chk.checked;
+                        toggleFileSelection(file.id, e);
+                    };
+                } else {
+                    div.onclick = () => loadFile(file.id);
+                }
+
+                let iconHTML = `<i class="fa-brands fa-html5 ${isSelected ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'} text-lg transition"></i>`;
+                
+                // If Selection Mode, show Checkbox instead of Icon
+                if (isSelectionMode) {
+                    const checked = selectedIds.has(file.id) ? "checked" : "";
+                    iconHTML = `<input type="checkbox" id="chk-${file.id}" class="custom-checkbox" ${checked} onchange="toggleFileSelection('${file.id}', event)">`;
+                }
+
+                div.innerHTML = `
+                    <div class="flex-shrink-0 w-6 flex justify-center">${iconHTML}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate">${file.name}</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5 truncate flex justify-between">
+                            <span>${dateStr}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- STANDARD OPERATIONS ---
+
+        function loadFile(id) {
+            const file = libraryData.find(f => f.id == id);
+            if (!file) return;
+            document.getElementById('fileId').value = file.id;
+            document.getElementById('fileName').value = file.name;
+            document.getElementById('htmlCode').value = file.html;
+            updatePreview();
+            handleSearch();
+            
+            document.getElementById('btnDelete').classList.remove('hidden');
+            document.getElementById('btnShare').classList.remove('hidden');
+            const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
+            const extBtn = document.getElementById('btnExternal');
+            extBtn.href = `${baseUrl}/view.html?id=${id}`;
+            extBtn.classList.remove('hidden');
+        }
+
         async function handleBulkUpload(input) {
             const files = Array.from(input.files);
             if (files.length === 0) return;
-
-            const overlay = document.getElementById('bulkOverlay');
-            const status = document.getElementById('bulkStatus');
-            const bar = document.getElementById('bulkBar');
+            showOverlay("Importing Files...", "fa-cloud-arrow-up");
             
-            // Show Overlay
-            overlay.classList.remove('hidden');
-            overlay.classList.add('flex');
-
             for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                
-                // Update UI
-                const percent = Math.round(((i) / files.length) * 100);
-                status.innerText = `Importing "${file.name}" (${i+1} of ${files.length})`;
-                bar.style.width = percent + "%";
-
+                updateOverlay(i, files.length, `Importing "${files[i].name}"`);
                 try {
-                    // Read file
-                    const content = await readFileAsync(file);
-                    const name = file.name.replace(/\.[^/.]+$/, ""); // remove extension
-
-                    // Send to GAS (Wait for it to finish before next one)
-                    await saveToBackend(null, name, content);
-                    
-                } catch (e) {
-                    console.error("Error uploading " + file.name, e);
-                }
+                    const content = await readFileAsync(files[i]);
+                    const name = files[i].name.replace(/\.[^/.]+$/, "");
+                    await saveToBackend(null, name, content, 'save');
+                } catch (e) { console.error(e); }
             }
-
-            // Finish
-            bar.style.width = "100%";
-            status.innerText = "All files imported!";
-            setTimeout(() => {
-                overlay.classList.add('hidden');
-                overlay.classList.remove('flex');
-                manualSync(); // Refresh list
-                input.value = ''; // Reset input
-            }, 1000);
+            hideOverlay();
+            manualSync();
+            input.value = '';
         }
 
-        // Helper to read file as Promise
+        async function saveFile() {
+            const btn = document.getElementById('btnSave');
+            const loader = document.getElementById('saveLoader');
+            const status = document.getElementById('statusText');
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+            loader.classList.remove('hidden');
+            btn.querySelector('span').innerText = "Saving";
+
+            try {
+                await saveToBackend(
+                    document.getElementById('fileId').value,
+                    document.getElementById('fileName').value || "Untitled",
+                    document.getElementById('htmlCode').value,
+                    'save'
+                );
+                setTimeout(() => {
+                    manualSync();
+                    status.style.opacity = '1';
+                    setTimeout(() => status.style.opacity = '0', 3000);
+                    btn.querySelector('span').innerText = "Save";
+                }, 500);
+            } catch (e) {
+                alert("Save failed.");
+                btn.querySelector('span').innerText = "Save";
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+                loader.classList.add('hidden');
+            }
+        }
+
+        async function deleteFile() {
+            if(!confirm("Are you sure?")) return;
+            await saveToBackend(document.getElementById('fileId').value, null, null, 'delete');
+            setTimeout(() => { resetEditor(); manualSync(); }, 1000);
+        }
+
+        // --- HELPERS ---
+
         function readFileAsync(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -279,34 +473,10 @@
             });
         }
 
-        // Helper to save to backend (Reused by Save Button and Bulk Upload)
-        async function saveToBackend(id, name, content) {
-            const payload = {
-                id: id,
-                name: name,
-                html: content,
-                action: 'save'
-            };
-            // We use no-cors to avoid CORS errors, but we can't read response.
-            // We assume success if no network error thrown.
-            await fetch(API_URL, { 
-                method: 'POST', 
-                mode: 'no-cors', 
-                body: JSON.stringify(payload) 
-            });
-            // Small delay to ensure GAS processes it
-            await new Promise(r => setTimeout(r, 800)); 
-        }
-
-
-        // --- STANDARD FUNCTIONS ---
-
-        function manualSync() {
-            const icon = document.querySelector('#btnSync i');
-            icon.classList.add('fa-spin');
-            fetchLibrarySilent().then(() => {
-                setTimeout(() => icon.classList.remove('fa-spin'), 500);
-            });
+        async function saveToBackend(id, name, content, action) {
+            const payload = { id: id, name: name, html: content, action: action };
+            await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            await new Promise(r => setTimeout(r, 600)); // Delay for stability
         }
 
         async function fetchLibrarySilent() {
@@ -324,61 +494,17 @@
                     document.getElementById('syncStatus').innerText = "Synced " + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 }
             } catch (e) {
-                console.error("Sync failed", e);
                 document.getElementById('syncStatus').innerText = "Offline";
                 document.getElementById('syncStatus').classList.add('text-rose-500');
             } finally { isSyncing = false; }
         }
 
-        function handleSearch() {
-            const term = document.getElementById('searchBox').value.toLowerCase();
-            const filtered = libraryData.filter(f => f.name.toLowerCase().includes(term));
-            renderList(filtered);
-        }
-
-        function renderList(files) {
-            const container = document.getElementById('fileList');
-            container.innerHTML = '';
-            if (files.length === 0) {
-                container.innerHTML = '<div class="text-slate-600 text-sm text-center mt-10">No projects found</div>';
-                return;
-            }
-            const currentId = document.getElementById('fileId').value;
-            files.forEach(file => {
-                const isSelected = file.id == currentId;
-                const activeClass = isSelected ? "bg-indigo-500/10 border-indigo-500/30" : "hover:bg-white/5 border-transparent hover:border-white/5";
-                const div = document.createElement('div');
-                div.className = `group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex flex-col border border-transparent fade-in ${activeClass}`;
-                div.onclick = () => loadFile(file.id);
-                div.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <i class="fa-brands fa-html5 ${isSelected ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'} text-lg transition"></i>
-                        <span class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate flex-1">${file.name}</span>
-                    </div>
-                    <div class="text-[10px] text-slate-500 pl-8 mt-0.5 truncate flex justify-between">
-                        <span>${new Date(file.date).toLocaleDateString()}</span>
-                    </div>`;
-                container.appendChild(div);
+        function manualSync() {
+            const icon = document.querySelector('#btnSync i');
+            icon.classList.add('fa-spin');
+            fetchLibrarySilent().then(() => {
+                setTimeout(() => icon.classList.remove('fa-spin'), 500);
             });
-        }
-
-        function loadFile(id) {
-            const file = libraryData.find(f => f.id == id);
-            if (!file) return;
-            document.getElementById('fileId').value = file.id;
-            document.getElementById('fileName').value = file.name;
-            document.getElementById('htmlCode').value = file.html;
-            
-            updatePreview();
-            handleSearch(); // Refresh list highlight
-            
-            document.getElementById('btnDelete').classList.remove('hidden');
-            document.getElementById('btnShare').classList.remove('hidden');
-            
-            const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
-            const extBtn = document.getElementById('btnExternal');
-            extBtn.href = `${baseUrl}/view.html?id=${id}`;
-            extBtn.classList.remove('hidden');
         }
 
         function updatePreview() {
@@ -386,8 +512,7 @@
             const iframe = document.getElementById('previewFrame');
             if (!code.trim()) {
                 document.getElementById('emptyPreview').classList.remove('hidden');
-                iframe.srcdoc = "";
-                return;
+                iframe.srcdoc = ""; return;
             }
             document.getElementById('emptyPreview').classList.add('hidden');
             iframe.srcdoc = code;
@@ -418,54 +543,43 @@
             });
         }
 
-        async function saveFile() {
-            const btn = document.getElementById('btnSave');
-            const loader = document.getElementById('saveLoader');
-            const status = document.getElementById('statusText');
-            
-            // Gather Data
-            const id = document.getElementById('fileId').value;
-            const name = document.getElementById('fileName').value || "Untitled";
-            const content = document.getElementById('htmlCode').value;
+        function cycleLayout() {
+            const editor = document.getElementById('editorPane');
+            const preview = document.getElementById('previewPane');
+            const icon = document.getElementById('layoutIcon');
+            const text = document.getElementById('layoutText');
+            layoutMode = (layoutMode + 1) % 3;
+            editor.classList.remove('hidden', 'w-1/2', 'w-full');
+            preview.classList.remove('hidden', 'w-1/2', 'w-full');
 
-            // UI Feedback
-            btn.disabled = true;
-            btn.classList.add('opacity-75');
-            loader.classList.remove('hidden');
-            btn.querySelector('span').innerText = "Saving";
-
-            try {
-                // Use the shared save function
-                await saveToBackend(id, name, content);
-                
-                setTimeout(() => {
-                    manualSync(); // Force update sidebar
-                    status.style.opacity = '1'; // Show green "Saved" text
-                    setTimeout(() => status.style.opacity = '0', 3000);
-                    btn.querySelector('span').innerText = "Save";
-                }, 500);
-
-            } catch (e) {
-                alert("Save failed.");
-                btn.querySelector('span').innerText = "Save";
-            } finally {
-                btn.disabled = false;
-                btn.classList.remove('opacity-75');
-                loader.classList.add('hidden');
+            if (layoutMode === 0) {
+                editor.classList.add('w-1/2'); preview.classList.add('w-1/2');
+                icon.className = "fa-solid fa-table-columns"; text.innerText = "Split";
+            } else if (layoutMode === 1) {
+                editor.classList.add('w-full'); preview.classList.add('hidden');
+                icon.className = "fa-solid fa-code"; text.innerText = "Code";
+            } else {
+                editor.classList.add('hidden'); preview.classList.add('w-full');
+                icon.className = "fa-solid fa-eye"; text.innerText = "Preview";
             }
         }
 
-        async function deleteFile() {
-            if(!confirm("Are you sure you want to delete this project?")) return;
-            const id = document.getElementById('fileId').value;
-            
-            await fetch(API_URL, { 
-                method: 'POST', 
-                mode: 'no-cors', 
-                body: JSON.stringify({ id: id, action: 'delete' }) 
-            });
-            
-            setTimeout(() => { resetEditor(); manualSync(); }, 1000);
+        function showOverlay(title, iconClass) {
+            const overlay = document.getElementById('bulkOverlay');
+            document.getElementById('bulkTitle').innerText = title;
+            document.getElementById('bulkIcon').className = `fa-solid ${iconClass} text-4xl text-indigo-500 animate-bounce`;
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+        }
+        function updateOverlay(current, total, text) {
+            document.getElementById('bulkStatus').innerText = text + ` (${current + 1}/${total})`;
+            document.getElementById('bulkBar').style.width = Math.round(((current) / total) * 100) + "%";
+        }
+        function hideOverlay() {
+            document.getElementById('bulkBar').style.width = "100%";
+            setTimeout(() => {
+                const overlay = document.getElementById('bulkOverlay');
+                overlay.classList.add('hidden'); overlay.classList.remove('flex');
+            }, 500);
         }
     </script>
 </body>
