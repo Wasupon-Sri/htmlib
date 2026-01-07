@@ -59,7 +59,7 @@
             
             <div class="flex lg:hidden justify-between gap-2">
                 <button onclick="toggleSelectMode()" id="btnSelectModeMobile" class="flex-1 bg-white/5 text-slate-300 py-2 rounded-lg text-xs font-medium border border-white/10">Select</button>
-                <button onclick="manualSync()" class="flex-1 bg-white/5 text-slate-300 py-2 rounded-lg text-xs font-medium border border-white/10">Sync</button>
+                <button onclick="manualSync()" id="btnSyncMobile" class="flex-1 bg-white/5 text-slate-300 py-2 rounded-lg text-xs font-medium border border-white/10">Sync</button>
             </div>
 
             <div class="relative group">
@@ -145,14 +145,12 @@
 
         function init() { fetchList(); }
 
-        // --- IMPROVED TOGGLE LOGIC ---
         function toggleSidebar() {
             const sidebar = document.getElementById('mainSidebar');
             const backdrop = document.getElementById('sidebarBackdrop');
             const isLargeScreen = window.innerWidth >= 1024;
 
             if (isLargeScreen) {
-                // Desktop/Tablet Mode: Toggle Visibility (Collapsible)
                 if (sidebar.classList.contains('hidden')) {
                     sidebar.classList.remove('hidden');
                     sidebar.classList.add('flex');
@@ -161,7 +159,6 @@
                     sidebar.classList.remove('flex');
                 }
             } else {
-                // Mobile Mode: Toggle Slide-in
                 if (sidebar.classList.contains('-translate-x-full')) {
                     sidebar.classList.remove('-translate-x-full');
                     backdrop.classList.remove('hidden');
@@ -200,10 +197,7 @@
         async function loadFile(id) {
             const fileMeta = libraryData.find(f => f.id == id);
             if (!fileMeta) return;
-            
-            // Auto close sidebar on Mobile only
             if (window.innerWidth < 1024) toggleSidebar(); 
-
             document.getElementById('fileId').value = fileMeta.id;
             document.getElementById('fileName').value = fileMeta.name;
             document.getElementById('htmlCode').value = "Loading content...";
@@ -245,6 +239,7 @@
         }
 
         function updatePreview() { const code = document.getElementById('htmlCode').value; const iframe = document.getElementById('previewFrame'); if (!code.trim()) { document.getElementById('emptyPreview').classList.remove('hidden'); iframe.srcdoc = ""; return; } document.getElementById('emptyPreview').classList.add('hidden'); iframe.srcdoc = code; }
+        
         async function saveFile() {
             const btn = document.getElementById('btnSave'); const icon = btn.querySelector('i'); const label = btn.querySelector('span');
             btn.disabled = true; btn.classList.add('opacity-75'); document.getElementById('saveLoader').classList.remove('hidden'); if(label) label.innerText = "Saving"; icon.style.display = 'none';
@@ -252,6 +247,7 @@
             catch (e) { alert("Save failed: " + e.message); if(label) label.innerText = "Save"; icon.style.display = 'inline-block'; } 
             finally { btn.disabled = false; btn.classList.remove('opacity-75'); document.getElementById('saveLoader').classList.add('hidden'); }
         }
+        
         async function saveToBackend(id, name, content, action) { const payload = { id: id, name: name, html: content, action: action }; const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Server Error: " + res.status); const text = await res.text(); const json = JSON.parse(text); if (json.status === "error") throw new Error(json.message); }
         function handleSearch() { const term = document.getElementById('searchBox').value.toLowerCase(); const filtered = libraryData.filter(f => String(f.name).toLowerCase().includes(term)); renderList(filtered); }
         function renderList(files) {
@@ -289,10 +285,21 @@
         async function deleteFile() { if(!confirm("Are you sure?")) return; await saveToBackend(document.getElementById('fileId').value, null, null, 'delete'); resetEditor(); fetchList(); }
         async function bulkDelete() { if(selectedIds.size === 0) return; if(!confirm(`Delete ${selectedIds.size} files?`)) return; showOverlay("Deleting...", "fa-trash-can"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); await saveToBackend(ids[i], null, null, 'delete'); } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); resetEditor(); }
         async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}&t=${new Date().getTime()}`); const t = await res.text(); const file = JSON.parse(t); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
+        
+        // --- UPDATED SYNC FUNCTION ---
         function manualSync() { 
-            const icon = document.querySelector('#btnSync i'); if(icon) icon.classList.add('fa-spin'); 
-            fetchList().then(() => { if(icon) setTimeout(() => icon.classList.remove('fa-spin'), 500); }); 
+            const icon = document.querySelector('#btnSync i'); 
+            const btnMob = document.getElementById('btnSyncMobile');
+            
+            if(icon) icon.classList.add('fa-spin'); 
+            if(btnMob) btnMob.innerText = "Syncing...";
+
+            fetchList().then(() => { 
+                if(icon) setTimeout(() => icon.classList.remove('fa-spin'), 500); 
+                if(btnMob) btnMob.innerText = "Sync";
+            }); 
         }
+
         function resetEditor() { document.getElementById('fileId').value = ''; document.getElementById('fileName').value = ''; document.getElementById('htmlCode').value = ''; document.getElementById('previewFrame').srcdoc = ""; document.getElementById('emptyPreview').classList.remove('hidden'); document.getElementById('btnDelete').classList.add('hidden'); document.getElementById('btnShare').classList.add('hidden'); document.getElementById('btnExternal').classList.add('hidden'); handleSearch(); if(window.innerWidth < 1024) toggleSidebar(); }
         async function handleBulkUpload(input) { const files = Array.from(input.files); if(files.length===0)return; showOverlay("Importing...", "fa-cloud-arrow-up"); for(let i=0; i<files.length; i++) { updateOverlay(i, files.length); const content = await new Promise(r => {const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsText(files[i]);}); const name = files[i].name.replace(/\.[^/.]+$/, ""); await saveToBackend(null, name, content, 'save'); } hideOverlay(); fetchList(); input.value=''; }
         function showOverlay(title, icon) { document.getElementById('bulkOverlay').classList.remove('hidden'); document.getElementById('bulkOverlay').classList.add('flex'); document.getElementById('bulkTitle').innerText = title; document.getElementById('bulkIcon').className = `fa-solid ${icon} text-4xl text-indigo-500 animate-bounce`; }
