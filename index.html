@@ -270,4 +270,59 @@
         async function saveFile() {
             const btn = document.getElementById('btnSave'); const icon = btn.querySelector('i'); const label = btn.querySelector('span');
             btn.disabled = true; btn.classList.add('opacity-75'); document.getElementById('saveLoader').classList.remove('hidden'); if(label) label.innerText = "Saving"; icon.style.display = 'none';
-            try { await saveToBackend(document.getElementById('fileId').value, docume
+            try { await saveToBackend(document.getElementById('fileId').value, document.getElementById('fileName').value || "Untitled", document.getElementById('htmlCode').value, 'save'); setTimeout(() => { fetchList(); document.getElementById('statusText').style.opacity = '1'; setTimeout(() => document.getElementById('statusText').style.opacity = '0', 3000); if(label) label.innerText = "Save"; icon.style.display = 'inline-block'; }, 500); } 
+            catch (e) { alert("Save failed: " + e.message); if(label) label.innerText = "Save"; icon.style.display = 'inline-block'; } 
+            finally { btn.disabled = false; btn.classList.remove('opacity-75'); document.getElementById('saveLoader').classList.add('hidden'); }
+        }
+        
+        async function saveToBackend(id, name, content, action) { const payload = { id: id, name: name, html: content, action: action }; const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Server Error: " + res.status); const text = await res.text(); const json = JSON.parse(text); if (json.status === "error") throw new Error(json.message); }
+        function handleSearch() { const term = document.getElementById('searchBox').value.toLowerCase(); const filtered = libraryData.filter(f => String(f.name).toLowerCase().includes(term)); renderList(filtered); }
+        function renderList(files) {
+            const container = document.getElementById('fileList'); container.innerHTML = '';
+            if (files.length === 0) { container.innerHTML = '<div class="text-slate-600 text-sm text-center mt-10">No projects found</div>'; return; }
+            const currentId = document.getElementById('fileId').value;
+            files.forEach(file => {
+                const isSelected = file.id == currentId; const div = document.createElement('div');
+                const activeClass = isSelected ? "bg-indigo-500/10 border-indigo-500/30" : "hover:bg-white/5 border-transparent hover:border-white/5";
+                const dateObj = new Date(file.date); const dateStr = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ", " + dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                div.className = `group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex items-center gap-3 border border-transparent fade-in ${activeClass}`;
+                if (isSelectionMode) {
+                    div.onclick = (e) => { const chk = document.getElementById(`chk-${file.id}`); chk.checked = !chk.checked; toggleFileSelection(file.id, e); };
+                    const checked = selectedIds.has(file.id) ? "checked" : "";
+                    div.innerHTML = `<div class="flex-shrink-0 w-6 flex justify-center"><input type="checkbox" id="chk-${file.id}" class="custom-checkbox" ${checked} onchange="toggleFileSelection('${file.id}', event)"></div><div class="flex-1 min-w-0"><div class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate">${file.name}</div><div class="text-[10px] text-slate-500 mt-0.5">${dateStr}</div></div>`;
+                } else {
+                    div.onclick = () => loadFile(file.id);
+                    div.innerHTML = `<div class="flex-shrink-0 w-6 flex justify-center"><i class="fa-brands fa-html5 ${isSelected ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'} text-lg transition"></i></div><div class="flex-1 min-w-0"><div class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate">${file.name}</div><div class="text-[10px] text-slate-500 mt-0.5">${dateStr}</div></div>`;
+                }
+                container.appendChild(div);
+            });
+        }
+        function toggleSelectMode() {
+            isSelectionMode = !isSelectionMode; selectedIds.clear(); const btn = document.getElementById('btnSelectMode'); const btnMob = document.getElementById('btnSelectModeMobile');
+            const activeStyle = ['text-indigo-400', 'bg-white/10', 'border-indigo-500/50'];
+            if (isSelectionMode) { 
+                if(btn) btn.classList.add(...activeStyle); if(btnMob) { btnMob.classList.add('bg-indigo-600', 'text-white'); btnMob.classList.remove('bg-white/5', 'text-slate-300'); }
+                document.getElementById('actionsStandard').classList.add('hidden'); document.getElementById('actionsSelection').classList.remove('hidden'); document.getElementById('actionsSelection').classList.add('grid'); 
+            } else { 
+                if(btn) btn.classList.remove(...activeStyle); if(btnMob) { btnMob.classList.remove('bg-indigo-600', 'text-white'); btnMob.classList.add('bg-white/5', 'text-slate-300'); }
+                document.getElementById('actionsStandard').classList.remove('hidden'); document.getElementById('actionsSelection').classList.add('hidden'); document.getElementById('actionsSelection').classList.remove('grid'); 
+            } handleSearch();
+        }
+        function toggleFileSelection(id, event) { event.stopPropagation(); if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); const chk = document.getElementById(`chk-${id}`); if(chk) chk.checked = selectedIds.has(id); }
+        async function deleteFile() { if(!confirm("Are you sure?")) return; await saveToBackend(document.getElementById('fileId').value, null, null, 'delete'); resetEditor(); fetchList(); }
+        async function bulkDelete() { if(selectedIds.size === 0) return; if(!confirm(`Delete ${selectedIds.size} files?`)) return; showOverlay("Deleting...", "fa-trash-can"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); await saveToBackend(ids[i], null, null, 'delete'); } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); resetEditor(); }
+        async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}&t=${new Date().getTime()}`); const t = await res.text(); const file = JSON.parse(t); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
+        function manualSync() { 
+            const icon = document.querySelector('#btnSync i'); const btnMob = document.getElementById('btnSyncMobile');
+            if(icon) icon.classList.add('fa-spin'); if(btnMob) btnMob.innerText = "Syncing...";
+            fetchList().then(() => { if(icon) setTimeout(() => icon.classList.remove('fa-spin'), 500); if(btnMob) btnMob.innerText = "Sync"; }); 
+        }
+        function resetEditor() { document.getElementById('fileId').value = ''; document.getElementById('fileName').value = ''; document.getElementById('htmlCode').value = ''; document.getElementById('previewFrame').srcdoc = ""; document.getElementById('emptyPreview').classList.remove('hidden'); document.getElementById('btnDelete').classList.add('hidden'); document.getElementById('btnShare').classList.add('hidden'); document.getElementById('btnExternal').classList.add('hidden'); handleSearch(); if(window.innerWidth < 1536) toggleSidebar(); }
+        async function handleBulkUpload(input) { const files = Array.from(input.files); if(files.length===0)return; showOverlay("Importing...", "fa-cloud-arrow-up"); for(let i=0; i<files.length; i++) { updateOverlay(i, files.length); const content = await new Promise(r => {const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsText(files[i]);}); const name = files[i].name.replace(/\.[^/.]+$/, ""); await saveToBackend(null, name, content, 'save'); } hideOverlay(); fetchList(); input.value=''; }
+        function showOverlay(title, icon) { document.getElementById('bulkOverlay').classList.remove('hidden'); document.getElementById('bulkOverlay').classList.add('flex'); document.getElementById('bulkTitle').innerText = title; document.getElementById('bulkIcon').className = `fa-solid ${icon} text-4xl text-indigo-500 animate-bounce`; }
+        function updateOverlay(cur, tot) { document.getElementById('bulkStatus').innerText = `${cur+1}/${tot}`; document.getElementById('bulkBar').style.width = Math.round((cur/tot)*100)+"%"; }
+        function hideOverlay() { document.getElementById('bulkOverlay').classList.add('hidden'); document.getElementById('bulkOverlay').classList.remove('flex'); }
+        function shareLink() { const id = document.getElementById('fileId').value; if(!id)return; const url = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}/view.html?id=${id}`; navigator.clipboard.writeText(url).then(()=>{ const btn=document.querySelector('#btnShare'); const old=btn.innerHTML; btn.innerHTML=`<i class="fa-solid fa-check text-green-400"></i>`; setTimeout(()=>btn.innerHTML=old, 2000); }); }
+    </script>
+</body>
+</html>
