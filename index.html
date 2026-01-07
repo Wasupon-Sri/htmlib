@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* Fix: Use dynamic viewport height for mobile keyboards */
+        /* Fix: Dynamic viewport for mobile browsers */
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; height: 100dvh; }
         .code-font { font-family: 'JetBrains Mono', monospace; }
         
@@ -87,34 +87,35 @@
 
     <main class="flex-1 flex flex-col relative bg-slate-900 w-full h-full overflow-hidden">
         
-        <header class="h-16 border-b border-white/10 flex items-center justify-between px-4 md:px-6 bg-slate-900/95 backdrop-blur z-10 flex-shrink-0 relative">
+        <header class="h-16 border-b border-white/10 flex items-center justify-between px-3 md:px-6 bg-slate-900/95 backdrop-blur z-10 flex-shrink-0 relative">
             
-            <div class="flex items-center gap-3 flex-1 min-w-0 mr-2">
-                <button onclick="toggleSidebar()" class="2xl:hidden text-slate-300 hover:text-white p-2 rounded hover:bg-white/5 mr-1 flex-shrink-0" title="Toggle Sidebar">
+            <div class="flex items-center gap-2 flex-1 min-w-0 mr-2">
+                <button onclick="toggleSidebar()" class="2xl:hidden text-slate-300 hover:text-white p-2 rounded hover:bg-white/5 flex-shrink-0" title="Toggle Sidebar">
                     <i class="fa-solid fa-bars text-xl"></i>
                 </button>
-                
-                <input type="text" id="fileName" placeholder="Untitled Project" class="w-full text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 focus:text-white bg-transparent focus:outline-none focus:ring-0 placeholder-slate-600 transition truncate">
+                <input type="text" id="fileName" placeholder="Untitled Project" class="w-full text-base md:text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 focus:text-white bg-transparent focus:outline-none focus:ring-0 placeholder-slate-600 transition truncate min-w-[50px]">
             </div>
             
-            <div class="flex items-center gap-2 md:gap-3 flex-shrink-0">
+            <div class="flex items-center gap-1 md:gap-3 flex-shrink-0">
                 <input type="hidden" id="fileId">
                 
-                <button onclick="cycleLayout()" class="text-slate-400 hover:text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 bg-white/5 border border-white/5" title="Change View">
+                <button onclick="cycleLayout()" class="text-slate-400 hover:text-white p-2 md:px-3 md:py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 bg-white/5 border border-white/5" title="Change View">
                     <i id="layoutIcon" class="fa-solid fa-table-columns"></i>
                     <span id="layoutText" class="hidden xl:inline">Split</span>
                 </button>
 
-                <button id="btnDelete" onclick="deleteFile()" class="hidden text-rose-400 hover:bg-rose-500/10 px-3 py-2 rounded-lg text-sm font-medium transition"><i class="fa-regular fa-trash-can"></i></button>
+                <button id="btnDelete" onclick="deleteFile()" class="hidden text-rose-400 hover:bg-rose-500/10 p-2 md:px-3 md:py-2 rounded-lg text-sm font-medium transition"><i class="fa-regular fa-trash-can"></i></button>
                 
-                <button id="btnShare" onclick="shareLink()" class="hidden text-indigo-400 hover:bg-indigo-500/10 px-3 py-2 rounded-lg text-sm font-medium transition border border-indigo-500/20">
+                <button id="btnShare" onclick="shareLink()" class="hidden text-indigo-400 hover:bg-indigo-500/10 p-2 md:px-3 md:py-2 rounded-lg text-sm font-medium transition border border-indigo-500/20">
                     <i class="fa-solid fa-share-nodes"></i>
                     <span class="hidden xl:inline ml-1">Share</span>
                 </button>
 
-                <a id="btnExternal" href="#" target="_blank" class="hidden text-slate-400 hover:text-white px-3 py-2 rounded-lg text-sm transition" title="Open in New Tab"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                <a id="btnExternal" href="#" target="_blank" class="hidden text-slate-400 hover:text-white p-2 md:px-3 md:py-2 rounded-lg text-sm transition items-center justify-center" title="Open in New Tab">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
 
-                <button onclick="saveFile()" id="btnSave" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-4 md:px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-900/50 transition transform active:scale-95 flex items-center gap-2 flex-shrink-0">
+                <button onclick="saveFile()" id="btnSave" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-3 md:px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-900/50 transition transform active:scale-95 flex items-center gap-2 flex-shrink-0">
                     <i class="fa-solid fa-cloud-arrow-up"></i>
                     <span class="hidden md:inline">Save</span>
                     <div id="saveLoader" class="loader hidden ml-1" style="border-top-color: white;"></div>
@@ -156,13 +157,12 @@
         let layoutMode = 0; 
         let isSelectionMode = false;
         let selectedIds = new Set();
-        // Force Mobile logic for anything smaller than 2XL monitor
         let isMobile = window.innerWidth < 1536; 
 
         window.onload = function() {
             init();
             setInterval(fetchList, 5000);
-            if (isMobile) { layoutMode = 2; applyLayout(); } // Default to Preview
+            if (isMobile) { layoutMode = 2; applyLayout(); } 
         };
 
         function init() { fetchList(); }
@@ -170,17 +170,15 @@
         function toggleSidebar() {
             const sidebar = document.getElementById('mainSidebar');
             const backdrop = document.getElementById('sidebarBackdrop');
-            const isHugeScreen = window.innerWidth >= 1536; // 2xl
+            const isHugeScreen = window.innerWidth >= 1536; 
 
             if (isHugeScreen) {
-                // On Massive Screens: Toggle Visibility
                 if (sidebar.classList.contains('hidden')) {
                     sidebar.classList.remove('hidden'); sidebar.classList.add('flex');
                 } else {
                     sidebar.classList.add('hidden'); sidebar.classList.remove('flex');
                 }
             } else {
-                // On Tablets/Laptops: Slide In
                 if (sidebar.classList.contains('-translate-x-full')) {
                     sidebar.classList.remove('-translate-x-full');
                     backdrop.classList.remove('hidden');
@@ -219,7 +217,7 @@
         async function loadFile(id) {
             const fileMeta = libraryData.find(f => f.id == id);
             if (!fileMeta) return;
-            if (window.innerWidth < 1536) toggleSidebar(); // Auto-close on tablets
+            if (window.innerWidth < 1536) toggleSidebar(); 
             document.getElementById('fileId').value = fileMeta.id;
             document.getElementById('fileName').value = fileMeta.name;
             document.getElementById('htmlCode').value = "Loading content...";
@@ -232,10 +230,14 @@
                 updatePreview();
                 document.getElementById('btnDelete').classList.remove('hidden');
                 document.getElementById('btnShare').classList.remove('hidden');
-                const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
+                
+                // FIX: Ensure External Button is FLEX when revealed, not Block
                 const extBtn = document.getElementById('btnExternal');
+                const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/'));
                 extBtn.href = `${baseUrl}/view.html?id=${id}`;
                 extBtn.classList.remove('hidden');
+                extBtn.classList.add('flex');
+
             } catch(e) { document.getElementById('htmlCode').value = "Error: " + e.message; }
             finally { document.getElementById('editorOverlay').classList.add('hidden'); handleSearch(); }
         }
@@ -252,7 +254,7 @@
                 // Split
                 ed.classList.add('w-full', 'xl:w-1/2', 'flex');
                 pr.classList.add('w-full', 'xl:w-1/2', 'hidden', 'xl:flex'); 
-                if(window.innerWidth < 1280) { pr.classList.remove('flex'); pr.classList.add('hidden'); ic.className = "fa-solid fa-code"; tx.innerText = "Code"; } 
+                if(window.innerWidth < 1536) { pr.classList.remove('flex'); pr.classList.add('hidden'); ic.className = "fa-solid fa-code"; tx.innerText = "Code"; } 
                 else { ic.className = "fa-solid fa-table-columns"; tx.innerText = "Split"; }
             } else if (layoutMode === 1) {
                 // Code
@@ -268,59 +270,4 @@
         async function saveFile() {
             const btn = document.getElementById('btnSave'); const icon = btn.querySelector('i'); const label = btn.querySelector('span');
             btn.disabled = true; btn.classList.add('opacity-75'); document.getElementById('saveLoader').classList.remove('hidden'); if(label) label.innerText = "Saving"; icon.style.display = 'none';
-            try { await saveToBackend(document.getElementById('fileId').value, document.getElementById('fileName').value || "Untitled", document.getElementById('htmlCode').value, 'save'); setTimeout(() => { fetchList(); document.getElementById('statusText').style.opacity = '1'; setTimeout(() => document.getElementById('statusText').style.opacity = '0', 3000); if(label) label.innerText = "Save"; icon.style.display = 'inline-block'; }, 500); } 
-            catch (e) { alert("Save failed: " + e.message); if(label) label.innerText = "Save"; icon.style.display = 'inline-block'; } 
-            finally { btn.disabled = false; btn.classList.remove('opacity-75'); document.getElementById('saveLoader').classList.add('hidden'); }
-        }
-        
-        async function saveToBackend(id, name, content, action) { const payload = { id: id, name: name, html: content, action: action }; const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Server Error: " + res.status); const text = await res.text(); const json = JSON.parse(text); if (json.status === "error") throw new Error(json.message); }
-        function handleSearch() { const term = document.getElementById('searchBox').value.toLowerCase(); const filtered = libraryData.filter(f => String(f.name).toLowerCase().includes(term)); renderList(filtered); }
-        function renderList(files) {
-            const container = document.getElementById('fileList'); container.innerHTML = '';
-            if (files.length === 0) { container.innerHTML = '<div class="text-slate-600 text-sm text-center mt-10">No projects found</div>'; return; }
-            const currentId = document.getElementById('fileId').value;
-            files.forEach(file => {
-                const isSelected = file.id == currentId; const div = document.createElement('div');
-                const activeClass = isSelected ? "bg-indigo-500/10 border-indigo-500/30" : "hover:bg-white/5 border-transparent hover:border-white/5";
-                const dateObj = new Date(file.date); const dateStr = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ", " + dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-                div.className = `group px-3 py-3 rounded-lg cursor-pointer mb-1 transition flex items-center gap-3 border border-transparent fade-in ${activeClass}`;
-                if (isSelectionMode) {
-                    div.onclick = (e) => { const chk = document.getElementById(`chk-${file.id}`); chk.checked = !chk.checked; toggleFileSelection(file.id, e); };
-                    const checked = selectedIds.has(file.id) ? "checked" : "";
-                    div.innerHTML = `<div class="flex-shrink-0 w-6 flex justify-center"><input type="checkbox" id="chk-${file.id}" class="custom-checkbox" ${checked} onchange="toggleFileSelection('${file.id}', event)"></div><div class="flex-1 min-w-0"><div class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate">${file.name}</div><div class="text-[10px] text-slate-500 mt-0.5">${dateStr}</div></div>`;
-                } else {
-                    div.onclick = () => loadFile(file.id);
-                    div.innerHTML = `<div class="flex-shrink-0 w-6 flex justify-center"><i class="fa-brands fa-html5 ${isSelected ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'} text-lg transition"></i></div><div class="flex-1 min-w-0"><div class="text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate">${file.name}</div><div class="text-[10px] text-slate-500 mt-0.5">${dateStr}</div></div>`;
-                }
-                container.appendChild(div);
-            });
-        }
-        function toggleSelectMode() {
-            isSelectionMode = !isSelectionMode; selectedIds.clear(); const btn = document.getElementById('btnSelectMode'); const btnMob = document.getElementById('btnSelectModeMobile');
-            const activeStyle = ['text-indigo-400', 'bg-white/10', 'border-indigo-500/50'];
-            if (isSelectionMode) { 
-                if(btn) btn.classList.add(...activeStyle); if(btnMob) { btnMob.classList.add('bg-indigo-600', 'text-white'); btnMob.classList.remove('bg-white/5', 'text-slate-300'); }
-                document.getElementById('actionsStandard').classList.add('hidden'); document.getElementById('actionsSelection').classList.remove('hidden'); document.getElementById('actionsSelection').classList.add('grid'); 
-            } else { 
-                if(btn) btn.classList.remove(...activeStyle); if(btnMob) { btnMob.classList.remove('bg-indigo-600', 'text-white'); btnMob.classList.add('bg-white/5', 'text-slate-300'); }
-                document.getElementById('actionsStandard').classList.remove('hidden'); document.getElementById('actionsSelection').classList.add('hidden'); document.getElementById('actionsSelection').classList.remove('grid'); 
-            } handleSearch();
-        }
-        function toggleFileSelection(id, event) { event.stopPropagation(); if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); const chk = document.getElementById(`chk-${id}`); if(chk) chk.checked = selectedIds.has(id); }
-        async function deleteFile() { if(!confirm("Are you sure?")) return; await saveToBackend(document.getElementById('fileId').value, null, null, 'delete'); resetEditor(); fetchList(); }
-        async function bulkDelete() { if(selectedIds.size === 0) return; if(!confirm(`Delete ${selectedIds.size} files?`)) return; showOverlay("Deleting...", "fa-trash-can"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); await saveToBackend(ids[i], null, null, 'delete'); } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); resetEditor(); }
-        async function bulkDuplicate() { if(selectedIds.size === 0) return; showOverlay("Duplicating...", "fa-copy"); const ids = Array.from(selectedIds); for(let i=0; i<ids.length; i++) { updateOverlay(i, ids.length); try { const res = await fetch(`${API_URL}?id=${ids[i]}&t=${new Date().getTime()}`); const t = await res.text(); const file = JSON.parse(t); await saveToBackend(null, file.name + " (Copy)", file.html, 'save'); } catch(e){} } hideOverlay(); isSelectionMode = false; toggleSelectMode(); fetchList(); }
-        function manualSync() { 
-            const icon = document.querySelector('#btnSync i'); const btnMob = document.getElementById('btnSyncMobile');
-            if(icon) icon.classList.add('fa-spin'); if(btnMob) btnMob.innerText = "Syncing...";
-            fetchList().then(() => { if(icon) setTimeout(() => icon.classList.remove('fa-spin'), 500); if(btnMob) btnMob.innerText = "Sync"; }); 
-        }
-        function resetEditor() { document.getElementById('fileId').value = ''; document.getElementById('fileName').value = ''; document.getElementById('htmlCode').value = ''; document.getElementById('previewFrame').srcdoc = ""; document.getElementById('emptyPreview').classList.remove('hidden'); document.getElementById('btnDelete').classList.add('hidden'); document.getElementById('btnShare').classList.add('hidden'); document.getElementById('btnExternal').classList.add('hidden'); handleSearch(); if(window.innerWidth < 1536) toggleSidebar(); }
-        async function handleBulkUpload(input) { const files = Array.from(input.files); if(files.length===0)return; showOverlay("Importing...", "fa-cloud-arrow-up"); for(let i=0; i<files.length; i++) { updateOverlay(i, files.length); const content = await new Promise(r => {const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsText(files[i]);}); const name = files[i].name.replace(/\.[^/.]+$/, ""); await saveToBackend(null, name, content, 'save'); } hideOverlay(); fetchList(); input.value=''; }
-        function showOverlay(title, icon) { document.getElementById('bulkOverlay').classList.remove('hidden'); document.getElementById('bulkOverlay').classList.add('flex'); document.getElementById('bulkTitle').innerText = title; document.getElementById('bulkIcon').className = `fa-solid ${icon} text-4xl text-indigo-500 animate-bounce`; }
-        function updateOverlay(cur, tot) { document.getElementById('bulkStatus').innerText = `${cur+1}/${tot}`; document.getElementById('bulkBar').style.width = Math.round((cur/tot)*100)+"%"; }
-        function hideOverlay() { document.getElementById('bulkOverlay').classList.add('hidden'); document.getElementById('bulkOverlay').classList.remove('flex'); }
-        function shareLink() { const id = document.getElementById('fileId').value; if(!id)return; const url = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}/view.html?id=${id}`; navigator.clipboard.writeText(url).then(()=>{ const btn=document.querySelector('#btnShare'); const old=btn.innerHTML; btn.innerHTML=`<i class="fa-solid fa-check text-green-400"></i>`; setTimeout(()=>btn.innerHTML=old, 2000); }); }
-    </script>
-</body>
-</html>
+            try { await saveToBackend(document.getElementById('fileId').value, docume
